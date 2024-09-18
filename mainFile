@@ -1,0 +1,238 @@
+/*----------------------------------------------------------------------------*/
+/*                                                                            */
+/*    Module:       main.cpp                                                  */
+/*    Author:       Admin2                                                    */
+/*    Created:      9/5/2024, 3:55:54 PM                                      */
+/*    Description:  V5 project                                                */
+/*                                                                            */
+/*----------------------------------------------------------------------------*/
+
+#include "vex.h"
+
+//intertial
+using namespace vex;
+
+// A global instance of competition
+competition Competition;
+// define your global instances of motors and other devices here
+
+/*---------------------------------------------------------------------------*/
+/*                          Pre-Autonomous Functions                         */
+/*                                                                           */
+/*  You may want to perform some actions before the competition starts.      */
+/*  Do them in the following function.  You must return from this function   */
+/*  or the autonomous and usercontrol tasks will not be started.  This       */
+/*  function is only called once after the V5 has been powered on and        */
+/*  not every time that the robot is disabled.                               */
+/*---------------------------------------------------------------------------*/
+
+vex::inertial imu = vex::inertial(PORT1);
+
+void pre_auton(void) {
+  resetDriveEncoders();
+  imu.calibrate();
+
+
+  // All activities that occur before the competition starts
+  // Example: clearing encoders, setting servo positions, ...
+}
+
+
+
+void translate(float distance){
+   float  drivekP = 0;
+   float  drivekD = 0;
+   float  drivekI = 0;
+   float  driveintegralThresh = 50;
+   float  drive_settle_error = 1.5;
+   float  drive_settle_time = 300;
+   float  timeout = 5000;
+
+   driveFor(distance, drivekP, drivekD, drivekI, driveintegralThresh, drive_settle_error, drive_settle_time, timeout);
+}
+
+void driveFor(float distance, float drivekP, float drivekD, float drivekI, float driveintegralThresh, float drive_settle_error, float drive_settle_time, float drive_timeout){
+    PID drivePID(distance, drivekP, drivekD, drivekI, driveintegralThresh, drive_settle_error, drive_settle_time, drive_timeout);
+    resetDriveEncoders();
+    distance = to_deg(distance);
+
+    while(drivePID.is_settled() == false){
+        float driveError = distance - avgEncoderMotor();
+        float driveOutput =  drivePID.compute(driveError);
+
+         printf("driveError: %f \n", driveError);
+        Brain.Screen.printAt(1, 200, "driveError: %f", driveError);
+        
+       Left.spin(fwd, driveOutput, volt);
+       Right.spin(fwd, driveOutput, volt);
+       task::sleep(10);
+
+    }
+
+}
+
+void turnForAngle(float angle){
+
+   float  turnkP = .15;
+   float  turnkD = 0;
+   float  turnkI = 0;
+   float  turnIntegralThresh = 15;
+   float  turn_settle_error = 1;
+   float  turn_settle_time = 200;
+   float turntimeout = 3000;
+
+   turnFor(angle, turnkP, turnkD, turnkI, turnIntegralThresh, turn_settle_error, turn_settle_time, turntimeout);
+    
+}
+
+void turnFor(float angle, float turnkP, float turnkD, float turnkI, float integralThresh, float turn_settle_error, float turn_settle_time, float turntimeout){
+    PID turnPID(reduce_negative_180_to_180(angle - imu.heading(degrees)), turnkP, turnkD, turnkI, integralThresh, turn_settle_error, turn_settle_time, turntimeout);
+
+     imu.resetHeading();
+    float turnMaxVoltage = 12;
+    while(turnPID.is_settled() == false){
+        
+        float turnError = reduce_negative_180_to_180(angle - imu.heading(degrees));
+        printf("turnError: %f \n", turnError);
+        Brain.Screen.printAt(1, 150, "turnError: %f", turnError);
+        float turnOutput = turnPID.compute(turnError);
+
+        turnOutput = clamp(turnOutput, -turnMaxVoltage, turnMaxVoltage);
+
+        Right.spin(fwd, turnOutput, volt);
+        Left.spin(fwd, -turnOutput, volt);
+        task::sleep(10);
+    }
+}
+
+//For ODOM to be DONE 
+/*void drivePose(float targetX, float targetY, float kP, float kD, float kI, float driveintegralThresh, float turnIntegralThresh, float drive_settle_error, float drive_settle_time, float turn_settle_error, float turn_settle_time, float drivetimeout, float turntimeout){
+    PID drivePID()
+    PID turnPID()
+
+    while(drivePID.is_settled() == false && turnPID.is_settled()){
+        
+    }
+}
+*/
+
+
+
+
+/*---------------------------------------------------------------------------*/
+/*                                                                           */
+/*                              Autonomous Task                              */
+/*                                                                           */
+/*  This task is used to control your robot during the autonomous phase of   */
+/*  a VEX Competition.                                                       */
+/*                                                                           */
+/*  You must modify the code to add your own robot specific commands here.   */
+/*---------------------------------------------------------------------------*/
+
+
+int autonSelected =  2;
+
+
+
+void autonomous(void) {
+  if (autonSelected == 1){
+    Brain.Screen.printAt(2, 100, "Auton Selected Right");
+  }
+  else if (autonSelected == 2){
+    Brain.Screen.printAt(2, 100, "Auton Selected Left");
+  }
+  else {
+    Brain.Screen.printAt(2, 100, "Auton Selected Skills");
+  }
+
+  switch(autonSelected){
+  case 1:
+  //imu.calibrate(1000);
+  //turnForAngle(90);
+  clamp1.open();
+  driving.driveFor(reverse, 90, inches, 40, vex::velocityUnits::pct, true);
+  clamp1.close();
+  wait(500, msec);
+  intake.setVelocity(100, pct);
+  intake.spinFor(2, seconds);
+   driving.driveFor(fwd, 45, inches, 40, vex::velocityUnits::pct, true);
+  break;
+
+  case 2: 
+  turnForAngle(90);
+
+  break;
+  
+  case 3:
+
+    break;
+  }
+
+}
+
+/*---------------------------------------------------------------------------*/
+/*                                                                           */
+/*                              User Control Task                            */
+/*                                                                           */
+/*  This task is used to control your robot during the user control phase of */
+/*  a VEX Competition.                                                       */
+/*                                                                           */
+/*  You must modify the code to add your own robot specific commands here.   */
+/*---------------------------------------------------------------------------*/
+
+void usercontrol(void) {
+  float wheelRadius = 2;//inches
+  float prevTheta = to_rad(imu.rotation(degrees));
+  float prevRightEncoders = rightTracking.position(deg);
+  float prevLeftEncoders = rightTracking.position(deg);
+  float prevForwardEncoders = avgEncoderMotor();
+  float sidewaysCenterDistance = 0; //placeholder
+  float forwardCenterDistance = 0; //placeholder
+  float xPosition;
+  float yPosition;
+  
+   
+
+  // User control code here, inside the loop
+  while (1) {
+     float xPosition = odometryX();
+      float yPosition = odometryY();
+      driveMove(master.Axis3.value(), master.Axis2.value(), 7); 
+
+      //tankDrive(master.Axis3.value(), master.Axis2.value(), 0);
+    Brain.Screen.printAt(1, 200, "Theta: %f", imu.heading(degrees));
+     
+    //Brain.Screen.printAt(1, 200, "X Pose: %f", xPosition);
+    //Brain.Screen.printAt(1, 150, "Y Pose:b %f", yPosition);
+    intakeCode();
+    clamp();
+    // This is the main execution loop for the user control program.
+    // Each time through the loop your program should update motor + servo
+    // values based on feedback from the joysticks.
+
+    // ........................................................................
+    // Insert user code here. This is where you use the joystick values to
+    // update your motors, etc.
+    // ........................................................................
+
+    wait(20, msec); // Sleep the task for a short amount of time to
+                    // prevent wasted resources.
+  }
+}
+
+//
+// Main will set up the competition functions and callbacks.
+//
+int main() {
+  // Set up callbacks for autonomous and driver control periods.
+  Competition.autonomous(autonomous);
+  Competition.drivercontrol(usercontrol);
+
+  // Run the pre-autonomous function.
+  pre_auton();
+
+  // Prevent main from exiting with an infinite loop.
+  while (true) {
+    wait(100, msec);
+  }
+}
